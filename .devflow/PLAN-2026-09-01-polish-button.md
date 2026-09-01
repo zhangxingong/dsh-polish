@@ -1650,3 +1650,12 @@ git commit -m "docs(dsh-polish): 安装与验收记录" -m "desktop profile 实�
 - Spec 覆盖：按钮位置（T5 order 31）/图标样式（T5 icon+css）/Tooltip 文案（T5）/只读置灰（T4+T5）/空输入 Toast（T4+T5）/覆盖替换+光标末尾（T4+T5）/优化规则（T2 system prompt）/原有功能不动（仅新增 slot entry，不 shadow 任何官方槽位）✓
 - 占位符扫描：无 TBD/TODO；所有代码步骤含完整代码 ✓
 - 类型一致性：`PolishAction`/`decidePolishAction`/`runPolishClick`/`postJson`/`EMPTY_HINT` 在 T4 定义、T5 消费，命名一致；`isTrustedPolishRequest` T1 定义 T3 消费；`OptimizeError` code 枚举 T2 定义 T2/T3 消费 ✓
+
+## 执行后变更记录（2026-09-01，均已同步上文）
+
+1. test 脚本改 glob 形式 `node --test tests/unit/*.test.mjs`（Windows node22 目录参数不生效，composer-tools 同款）
+2. Task 2 测试 `repeat(100)→repeat(1000)`（计划自相矛盾：712 被 1024 钳制）
+3. Task 3 只跑 host tsc，全量 `pnpm check` 挪到 Task 5（client tsconfig 空 include TS18003 预期）
+4. Task 5 shim `children` 改可选（TS2769，纯类型）
+5. Task 6 junction 规则修正：dsh-plugin-check 是 profile-only 包必须保留真实目录（brief 一刀切规则曾致一次启动崩溃，按 2026-08-28 维护记录恢复）
+6. 终审修复波（commit ca5563d）：host/client fetch 加 `AbortSignal.timeout(30_000)`；草稿竞态守卫（成功后 `getCurrentDraft()` 复核，变化则提示「输入已变化，未覆盖」不写入）；postJson null 体守卫 + 宿主 message 透出；组件 `.catch` 兜底 + 移除 `as never`；`pretest` 构建 + engines>=21；测试补缺 10 条（52 全绿）
