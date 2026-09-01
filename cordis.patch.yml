@@ -1,0 +1,4 @@
+# dsh-polish bundle patch：声明插件行（node 半入口 = package main lib/index.js）。
+- insert:
+    - id: polish
+      name: 'dsh-polish'
