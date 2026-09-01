@@ -130,7 +130,7 @@ Expected: FAIL — `Cannot find module '../../lib/trust-fence.js'`
   "scripts": {
     "build": "node build.mjs",
     "check": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit",
-    "test": "node --test tests/unit/"
+    "test": "node --test tests/unit/*.test.mjs"
   },
   "dsh": {
     "bundle": {
