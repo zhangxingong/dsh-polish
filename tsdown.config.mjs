@@ -118,6 +118,8 @@ export default [
       optimize: 'src/optimize.ts',
       handler: 'src/handler.ts',
       index: 'src/index.ts',
+      state: 'src/client/state.ts',
+      orchestrate: 'src/client/orchestrate.ts',
     },
     outDir: 'lib',
     format: 'esm',
