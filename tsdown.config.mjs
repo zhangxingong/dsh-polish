@@ -116,6 +116,8 @@ export default [
       'trust-fence': 'src/trust-fence.ts',
       'http-util': 'src/http-util.ts',
       optimize: 'src/optimize.ts',
+      handler: 'src/handler.ts',
+      index: 'src/index.ts',
     },
     outDir: 'lib',
     format: 'esm',

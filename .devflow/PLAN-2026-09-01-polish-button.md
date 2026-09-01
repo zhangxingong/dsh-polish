@@ -509,7 +509,7 @@ test.describe('buildOptimizePrompt', () => {
     assert.equal(buildOptimizePrompt('短').max_tokens, 1024)
   })
   test('max_tokens = 2×len+512，上限 8192', () => {
-    assert.equal(buildOptimizePrompt('x'.repeat(100)).max_tokens, 100 * 2 + 512)
+    assert.equal(buildOptimizePrompt('x'.repeat(1000)).max_tokens, 1000 * 2 + 512)
     assert.equal(buildOptimizePrompt('x'.repeat(100000)).max_tokens, 8192)
   })
   test('system 含四条优化规则与只输出正文约束', () => {
@@ -1073,9 +1073,11 @@ Run:
 ```
 pnpm build
 pnpm test
-pnpm check
+node node_modules/typescript/bin/tsc --noEmit
 ```
 Expected: PASS — fence 9 + optimize 10 + handler 8 全绿；tsc host 侧无错。
+
+注意：本任务只跑 host tsc。全量 `pnpm check`（含 client tsconfig）留到 Task 5 首次执行——client tsconfig 的 include 是 `src/client/**`，该目录 Task 5 才创建，此前跑 client tsc 必然 TS18003（空 include 预期行为，勿"修复"）。
 
 - [ ] **Step 7: Commit**
 
