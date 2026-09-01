@@ -4,7 +4,7 @@
  * standard props 直读：useProjection('permissions') / useInput / inputActions。
  * 红线：slots.inject 回调必须返回 register 的 disposer；全部挂 ctx.effect dispose 链。
  */
-import { createElement, useState } from 'react'
+import { createElement, useRef, useState } from 'react'
 import { Toast, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from 'cordis'
 import { decidePolishAction, type PolishAction } from './state.js'
@@ -48,6 +48,9 @@ function StarButton(props: EntryProps) {
   const permissions = props.useProjection('permissions') as { currentValue?: string } | undefined
   const action: PolishAction = decidePolishAction(permissions?.currentValue, phase, draft)
 
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const disabled = action === 'disabled' || busy
@@ -71,7 +74,8 @@ function StarButton(props: EntryProps) {
       setDraft: (text) => props.inputActions.setDraft(text),
       focusEnd,
       notify: (text) => setToast({ seq: Date.now(), text }),
-    }).finally(() => setBusy(false))
+      getCurrentDraft: () => draftRef.current,
+    }).catch(() => setToast({ seq: Date.now(), text: '优化失败，请稍后重试' })).finally(() => setBusy(false))
   }
 
   return createElement(
@@ -101,7 +105,7 @@ export function apply(ctx: ClientCtx): void {
   const offSlot = ctx.slots.inject('conversation.input.left', () =>
     ctx.slots.register(
       { name: 'conversation.input.left', id: 'polish-composer', order: 31, label: TOOLTIP },
-      (props: Record<string, unknown>) => createElement(StarButton, props as never),
+      (props: EntryProps) => createElement(StarButton, props),
     ),
   )
   ctx.effect(() => () => {

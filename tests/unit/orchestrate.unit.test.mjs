@@ -50,6 +50,33 @@ test.describe('runPolishClick', () => {
     await runPolishClick('ready', '原文', glue)
     assert.deepEqual(calls[1], ['notify', '优化失败，请稍后重试'])
   })
+  test('ready 成功但草稿已变化 → 提示不覆盖', async () => {
+    const base = makeGlue({ ok: true, text: '优化后' })
+    base.glue.getCurrentDraft = () => '用户新输入'
+    await runPolishClick('ready', '原文', base.glue)
+    assert.deepEqual(base.calls, [
+      ['post', '原文'],
+      ['notify', '输入已变化，未覆盖'],
+    ])
+  })
+  test('ready 成功且草稿未变 → 正常覆盖', async () => {
+    const base = makeGlue({ ok: true, text: '优化后' })
+    base.glue.getCurrentDraft = () => '原文'
+    await runPolishClick('ready', '原文', base.glue)
+    assert.deepEqual(base.calls, [
+      ['post', '原文'],
+      ['setDraft', '优化后'],
+      ['focusEnd'],
+    ])
+  })
+  test('空白结果文本 → 走失败提示', async () => {
+    const { calls, glue } = makeGlue({ ok: true, text: '   ' })
+    await runPolishClick('ready', '原文', glue)
+    assert.deepEqual(calls, [
+      ['post', '原文'],
+      ['notify', '优化失败，请稍后重试'],
+    ])
+  })
 })
 
 test.describe('postJson', () => {
@@ -72,5 +99,14 @@ test.describe('postJson', () => {
   test('非 JSON 体 → ok:false + 提示', async () => {
     const r = await postJson('/x', {}, async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad') } }))
     assert.equal(r.ok, false)
+  })
+  test('200 但体为 null → ok:false', async () => {
+    const r = await postJson('/x', {}, async () => ({ ok: true, status: 200, json: async () => null }))
+    assert.equal(r.ok, false)
+  })
+  test('HTTP 错误带宿主 message → 透出', async () => {
+    const r = await postJson('/x', {}, async () => ({ ok: false, status: 502, json: async () => ({ message: 'missing-credential 提示' }) }))
+    assert.equal(r.ok, false)
+    assert.match(r.message, /missing-credential 提示/)
   })
 })

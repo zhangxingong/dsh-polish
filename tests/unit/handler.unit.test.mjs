@@ -95,4 +95,25 @@ test.describe('handler（真实 HTTP）', () => {
     assert.deepEqual((await res.json()).code, 'internal-error')
     await close()
   })
+  test('413：content-length 预声明超限', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const { port } = new URL(baseUrl)
+    const res = await new Promise((resolve, reject) => {
+      const req = http.request(
+        { host: '127.0.0.1', port, path: '/dsh-polish/optimize', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '2097153' } },
+        (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => resolve({ status: r.statusCode, body: b })) },
+      )
+      req.on('error', reject)
+      req.end(JSON.stringify({ text: 'x' }))
+    })
+    assert.equal(res.status, 413)
+    await close()
+  })
+  test('400：text 超 200KB', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const res = await post(baseUrl, { text: 'x'.repeat(210000) })
+    assert.equal(res.status, 400)
+    assert.deepEqual((await res.json()).code, 'text-too-large')
+    await close()
+  })
 })

@@ -54,6 +54,7 @@ test.describe('callDeepSeekOptimize', () => {
     assert.equal(out, '优化后')
     assert.equal(calls[0].url, `${BASE_URL}/chat/completions`)
     assert.equal(calls[0].init.headers.authorization, 'Bearer sk-test')
+    assert.ok(calls[0].init.signal instanceof AbortSignal, '应带 AbortSignal 超时')
   })
   test('缺密钥：resolveApiKey 抛错 → missing-credential', async () => {
     await assert.rejects(

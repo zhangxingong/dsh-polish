@@ -17,11 +17,12 @@
     "cordis.patch.yml"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=21"
   },
   "scripts": {
     "build": "node build.mjs",
     "check": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit",
+    "pretest": "node build.mjs",
     "test": "node --test tests/unit/*.test.mjs"
   },
   "dsh": {

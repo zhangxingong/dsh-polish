@@ -76,6 +76,7 @@ export async function callDeepSeekOptimize(text: string, deps: OptimizeDeps = {}
         accept: 'application/json',
       },
       body: JSON.stringify(buildOptimizePrompt(text)),
+      signal: AbortSignal.timeout(30_000),
     })
   } catch (err) {
     throw new OptimizeError('transport', `DeepSeek API request failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err })

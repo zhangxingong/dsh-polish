@@ -18,7 +18,7 @@ export interface HttpLike {
 
 export type FetchLike = (
   input: string,
-  init: { method: string; headers: Record<string, string>; body: string },
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<HttpLike>
 
 export async function postJson(path: string, body: unknown, fetchImpl: FetchLike = fetch as unknown as FetchLike): Promise<PolishResult> {
@@ -28,11 +28,20 @@ export async function postJson(path: string, body: unknown, fetchImpl: FetchLike
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body ?? {}),
+      signal: AbortSignal.timeout(30_000),
     })
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
   if (!res.ok) {
+    try {
+      const parsed = (await res.json()) as { message?: unknown }
+      if (typeof parsed === 'object' && parsed !== null && typeof parsed.message === 'string') {
+        return { ok: false, message: `请求失败：${parsed.message}` }
+      }
+    } catch {
+      /* 保留默认 message */
+    }
     return { ok: false, message: `请求失败（HTTP ${res.status}）` }
   }
   let json: unknown
@@ -40,6 +49,9 @@ export async function postJson(path: string, body: unknown, fetchImpl: FetchLike
     json = await res.json()
   } catch {
     return { ok: false, message: '宿主返回了非 JSON 响应' }
+  }
+  if (typeof json !== 'object' || json === null) {
+    return { ok: false, message: '宿主返回了异常响应' }
   }
   return json as PolishResult
 }
@@ -49,6 +61,7 @@ export interface PolishGlue {
   setDraft(text: string): void
   focusEnd(): void
   notify(text: string): void
+  getCurrentDraft?: () => string
 }
 
 export const EMPTY_HINT = '请先输入内容再进行优化细化'
@@ -60,7 +73,12 @@ export async function runPolishClick(action: PolishAction, draft: string, glue: 
   }
   if (action !== 'ready') return
   const result = await glue.post(draft)
-  if (result.ok && typeof result.text === 'string' && result.text.length > 0) {
+  if (result.ok && typeof result.text === 'string' && result.text.trim().length > 0) {
+    const current = glue.getCurrentDraft?.()
+    if (current !== undefined && current !== draft) {
+      glue.notify('输入已变化，未覆盖')
+      return
+    }
     glue.setDraft(result.text)
     glue.focusEnd()
   } else {

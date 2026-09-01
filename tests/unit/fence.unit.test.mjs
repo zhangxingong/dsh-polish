@@ -45,4 +45,13 @@ test.describe('trust-fence', () => {
   test('无 Origin 头时放行 loopback', () => {
     assert.equal(isTrustedPolishRequest(req({ host: '127.0.0.1:3080' })), true)
   })
+  test('拒绝 127/8 越界 octet', () => {
+    assert.equal(isTrustedPolishRequest(req({ host: '127.0.0.999:3080' })), false)
+  })
+  test('拒绝畸形端口 Host（URL 解析失败）', () => {
+    assert.equal(isTrustedPolishRequest(req({ host: '127.0.0.1:abc' })), false)
+  })
+  test('拒绝大小写混合的 Cross-Site', () => {
+    assert.equal(isTrustedPolishRequest(req({ host: '127.0.0.1:3080', 'sec-fetch-site': 'Cross-Site' })), false)
+  })
 })
