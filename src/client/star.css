@@ -1,0 +1,13 @@
+/* 官方工具按钮同款配方（QueueDock .action 的 CSS 变量组合），深色主题自动适配。 */
+.dsh-polish-entry { display: inline-flex; align-items: center; }
+.dsh-polish-btn {
+  width: 28px; height: 28px; color: var(--dsw-alias-label-tertiary); cursor: pointer;
+  background: 0 0; border: none; border-radius: 999px; flex: none;
+  place-items: center; padding: 0; display: grid;
+}
+.dsh-polish-btn:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh-polish-btn:focus-visible { outline: 2px solid var(--dsw-alias-label-tertiary); outline-offset: -2px; }
+.dsh-polish-btn:disabled { cursor: default; opacity: .45; }
+.dsh-polish-btn svg { width: 14px; height: 14px; display: block; }
+@keyframes dsh-polish-spin { to { transform: rotate(360deg); } }
+.dsh-polish-btn[data-busy] svg { animation: dsh-polish-spin .9s linear infinite; }
