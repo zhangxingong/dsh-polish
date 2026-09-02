@@ -1,7 +1,7 @@
 // 白盒单测：optimize（lib/optimize.js 真实实现）
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOptimizePrompt, callDeepSeekOptimize, OptimizeError, MODEL, BASE_URL } from '../../lib/optimize.js'
+import { buildOptimizePrompt, callDeepSeekOptimize, OptimizeError, MODEL, BASE_URL, SYSTEM_PROMPT } from '../../lib/optimize.js'
 
 /** 造 fetch 替身：返回给定 status + json。 */
 function fakeFetch(status, json) {
@@ -42,6 +42,18 @@ test.describe('buildOptimizePrompt', () => {
       assert.ok(s.includes(kw), `system 应包含「${kw}」`)
     }
     assert.deepEqual(p.messages[1], { role: 'user', content: '你好' })
+  })
+  test('自定义 systemPrompt 透传', () => {
+    const p = buildOptimizePrompt('x', '自定义提示')
+    assert.equal(p.messages[0].content, '自定义提示')
+  })
+  test('空白 systemPrompt 回退默认', async () => {
+    await callDeepSeekOptimize('x', {
+      fetchImpl: fakeFetch(200, { choices: [{ message: { content: '优化后' } }] }),
+      resolveApiKey: async () => 'sk-test',
+      systemPrompt: '   ',
+    })
+    assert.equal(JSON.parse(calls[0].init.body).messages[0].content, SYSTEM_PROMPT)
   })
 })
 
@@ -98,5 +110,20 @@ test.describe('callDeepSeekOptimize', () => {
       }),
       (err) => err instanceof OptimizeError && err.code === 'api-error',
     )
+  })
+  test('不传 systemPrompt → 默认', async () => {
+    await callDeepSeekOptimize('x', {
+      fetchImpl: fakeFetch(200, { choices: [{ message: { content: '优化后' } }] }),
+      resolveApiKey: async () => 'sk-test',
+    })
+    assert.equal(JSON.parse(calls[0].init.body).messages[0].content, SYSTEM_PROMPT)
+  })
+  test('自定义 systemPrompt → 请求体带自定义', async () => {
+    await callDeepSeekOptimize('x', {
+      fetchImpl: fakeFetch(200, { choices: [{ message: { content: '优化后' } }] }),
+      resolveApiKey: async () => 'sk-test',
+      systemPrompt: '我的专属提示',
+    })
+    assert.equal(JSON.parse(calls[0].init.body).messages[0].content, '我的专属提示')
   })
 })

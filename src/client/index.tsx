@@ -10,6 +10,7 @@ import type { Context } from 'cordis'
 import { decidePolishAction, type PolishAction } from './state.js'
 import { postJson, runPolishClick } from './orchestrate.js'
 import { StarIcon } from './icon.js'
+import { createPolishCardStore, PolishSettingsCard, type SettingsScope } from './settings-card.js'
 import './star.css'
 
 export const inject = ['slots']
@@ -30,10 +31,14 @@ interface EntryProps {
 
 interface SlotsService {
   inject(key: string, callback: () => () => void): () => void
-  register(options: { name: string; id: string; order?: number; label?: string }, component: unknown): () => void
+  register(options: { name: string; id?: string; key?: string; order?: number; label?: string; inject?: () => unknown }, component: unknown): () => void
 }
 
-type ClientCtx = Context & { slots: SlotsService }
+interface SettingsScopeService {
+  bind(options: { namespace: string }): SettingsScope
+}
+
+type ClientCtx = Context & { slots: SlotsService; settingsScope?: SettingsScopeService }
 
 /** DOM 锚点：composer textarea 带 data-phase（官方属性）。 */
 function findComposerTextarea(): HTMLTextAreaElement | null {
@@ -111,4 +116,31 @@ export function apply(ctx: ClientCtx): void {
   ctx.effect(() => () => {
     offSlot()
   }, 'dsh-polish: client lifecycle (slot entry)')
+
+  // 设置卡片：settingsScope 服务缺失时 scoped fiber 不启动，星按钮主链路不受影响
+  ctx.inject(['settingsScope'], (sctx) => {
+    const scoped = sctx as ClientCtx
+    const scopeService = scoped.settingsScope
+    if (scopeService === undefined) return
+    const scope = scopeService.bind({ namespace: 'polish' })
+    const store = createPolishCardStore(scope)
+    const off = scoped.slots.inject('settings.plugin.item', () =>
+      scoped.slots.register(
+        {
+          name: 'settings.plugin.item',
+          key: 'polish',
+          inject: () => ({
+            hooks: { polishCard: store },
+            edit: (draft: string) => store.edit(draft),
+            save: () => store.save(),
+            discard: () => store.discard(),
+          }),
+        },
+        (props: Record<string, unknown>) => createElement(PolishSettingsCard, props as never),
+      ),
+    )
+    return () => {
+      off()
+    }
+  })
 }

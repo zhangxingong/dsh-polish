@@ -120,6 +120,7 @@ export default [
       index: 'src/index.ts',
       state: 'src/client/state.ts',
       orchestrate: 'src/client/orchestrate.ts',
+      'settings-state': 'src/client/settings-state.ts',
     },
     outDir: 'lib',
     format: 'esm',
@@ -129,6 +130,7 @@ export default [
     dts: false,
     sourcemap: false,
     clean: false,
+    external: ['@deepseek-ai/schemastery'],
   },
   {
     entry: { client: 'src/client/index.tsx' },

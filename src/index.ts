@@ -5,8 +5,9 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from 'cordis'
+import z from '@deepseek-ai/schemastery'
 import { createPolishHandler } from './handler.js'
-import { callDeepSeekOptimize, OptimizeError } from './optimize.js'
+import { callDeepSeekOptimize, OptimizeError, SYSTEM_PROMPT } from './optimize.js'
 
 const API_KEY_REF = 'DEEPSEEK_API_KEY'
 
@@ -28,6 +29,18 @@ interface CredentialsService {
 
 type InjectedCtx = Context & { webServer?: WebServerService }
 
+interface SettingsService {
+  register(
+    namespace: string,
+    schema: unknown,
+    options?: { base?: Record<string, unknown> },
+  ): SettingsScope
+}
+
+interface SettingsScope {
+  get(): { systemPrompt?: string } | undefined
+}
+
 async function resolveApiKey(ctx: Context): Promise<string> {
   const credentials = ctx.get('credentials') as CredentialsService | undefined
   if (credentials !== undefined) {
@@ -43,8 +56,21 @@ async function resolveApiKey(ctx: Context): Promise<string> {
 }
 
 export function apply(ctx: InjectedCtx): void {
+  // settings 服务缺失时静默降级：scope 保持 undefined，优化链路用默认提示词
+  let polishScope: SettingsScope | undefined
+  ctx.inject(['settings'], (sctx) => {
+    const service = (sctx as InjectedCtx & { settings?: SettingsService }).settings
+    if (service === undefined) return
+    polishScope = service.register('polish', z.object({ systemPrompt: z.string() }), {
+      base: { systemPrompt: SYSTEM_PROMPT },
+    })
+  })
+
   const handler = createPolishHandler(ctx, {
-    optimize: (text) => callDeepSeekOptimize(text, { resolveApiKey: () => resolveApiKey(ctx) }),
+    optimize: (text) => callDeepSeekOptimize(text, {
+      resolveApiKey: () => resolveApiKey(ctx),
+      systemPrompt: polishScope?.get()?.systemPrompt,
+    }),
   })
 
   const webServer = ctx.webServer

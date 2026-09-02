@@ -34,11 +34,13 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-primitives"
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
   },
   "devDependencies": {
+    "@deepseek-ai/schemastery": "3.18.1",
     "@types/node": "^26.2.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
