@@ -17,7 +17,7 @@ import './star.css'
 
 export const inject = ['slots']
 
-const TOOLTIP = '优化并细化当前用户输入'
+const TOOLTIP = '智能优化：让你的输入更精准'
 
 interface InputState {
   draft?: string
