@@ -6,11 +6,13 @@
  */
 import { createElement, useRef, useState } from 'react'
 import { Toast, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { Context } from 'cordis'
 import { decidePolishAction, type PolishAction } from './state.js'
 import { postJson, runPolishClick } from './orchestrate.js'
 import { StarIcon } from './icon.js'
-import { createPolishCardStore, PolishSettingsCard, type SettingsScope } from './settings-card.js'
+import { createPolishCardStore, type CardStoreLike, type SettingsScope } from './settings-card-store.js'
+import { PolishSettingsCard } from './settings-card.js'
 import './star.css'
 
 export const inject = ['slots']
@@ -123,7 +125,8 @@ export function apply(ctx: ClientCtx): void {
     const scopeService = scoped.settingsScope
     if (scopeService === undefined) return
     const scope = scopeService.bind({ namespace: 'polish' })
-    const store = createPolishCardStore(scope)
+    // 平台 d.ts 未声明 set（运行时存在）；CardStoreLike 只要求 set 语义，收窄一次
+    const store = createPolishCardStore(scope, (init) => createSnapshotStore(init) as unknown as CardStoreLike)
     const off = scoped.slots.inject('settings.plugin.item', () =>
       scoped.slots.register(
         {

@@ -121,6 +121,7 @@ export default [
       state: 'src/client/state.ts',
       orchestrate: 'src/client/orchestrate.ts',
       'settings-state': 'src/client/settings-state.ts',
+      'settings-card-store': 'src/client/settings-card-store.ts',
     },
     outDir: 'lib',
     format: 'esm',
