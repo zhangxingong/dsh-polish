@@ -23,7 +23,7 @@ dsh plugin --profile <name> add "link:<本目录绝对路径>"
 ## 开发
 
 ```bash
-pnpm test    # node --test，52 用例（pretest 自动构建）
+pnpm test    # node --test，87 用例（pretest 自动构建）
 pnpm check   # tsc host + client
 ```
 
