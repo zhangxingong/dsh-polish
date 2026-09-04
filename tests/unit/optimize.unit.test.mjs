@@ -27,13 +27,9 @@ test.describe('buildOptimizePrompt', () => {
     assert.equal(p.temperature, 0.3)
     assert.equal(p.stream, false)
   })
-  test('max_tokens 下限 1024', () => {
-    assert.equal(buildOptimizePrompt('短').max_tokens, 1024)
-  })
-  test('max_tokens = 2×len+512，上限 8192', () => {
-    // 注：len 需 ≥256 才进入 2×len+512 区间（下限 1024 钳制）；brief 原用 100 会命中钳制而失败
-    assert.equal(buildOptimizePrompt('x'.repeat(1000)).max_tokens, 1000 * 2 + 512)
-    assert.equal(buildOptimizePrompt('x'.repeat(100000)).max_tokens, 8192)
+  test('max_tokens 固定 8192（推理模型 reasoning 与正文共享预算，不得按文本长度压缩）', () => {
+    assert.equal(buildOptimizePrompt('短').max_tokens, 8192)
+    assert.equal(buildOptimizePrompt('x'.repeat(1000)).max_tokens, 8192)
   })
   test('system 含四条优化规则与只输出正文约束', () => {
     const p = buildOptimizePrompt('你好')
@@ -100,6 +96,15 @@ test.describe('callDeepSeekOptimize', () => {
         resolveApiKey: async () => 'sk-test',
       }),
       (err) => err instanceof OptimizeError && err.code === 'empty-response',
+    )
+  })
+  test('content 为空且 finish_reason=length → 错误消息带原因', async () => {
+    await assert.rejects(
+      callDeepSeekOptimize('x', {
+        fetchImpl: fakeFetch(200, { choices: [{ message: { content: '' }, finish_reason: 'length' }] }),
+        resolveApiKey: async () => 'sk-test',
+      }),
+      (err) => err instanceof OptimizeError && err.code === 'empty-response' && /finish_reason: length/.test(err.message),
     )
   })
   test('非 JSON 响应 → api-error', async () => {

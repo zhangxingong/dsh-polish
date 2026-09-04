@@ -62,7 +62,8 @@ export function buildOptimizePrompt(text: string, images: ImagePayload[] = [], s
     model: MODEL,
     temperature: 0.3,
     stream: false,
-    max_tokens: Math.min(Math.max(1024, Math.ceil(text.length * 2) + 512), MAX_OUTPUT_TOKENS),
+    // vision 模型 reasoning_content 与正文共享 max_tokens 预算；按文本长度压缩预算会让推理吃光配额 → content 空（实测 finish_reason=length）
+    max_tokens: MAX_OUTPUT_TOKENS,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content },
@@ -128,9 +129,11 @@ export async function callDeepSeekOptimize(text: string, deps: OptimizeDeps = {}
   } catch (err) {
     throw new OptimizeError('api-error', 'DeepSeek API returned a non-JSON body', { cause: err })
   }
-  const content = (payload as { choices?: Array<{ message?: { content?: unknown } }> })?.choices?.[0]?.message?.content
+  const choice = (payload as { choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }> })?.choices?.[0]
+  const content = choice?.message?.content
   if (typeof content !== 'string' || content.trim() === '') {
-    throw new OptimizeError('empty-response', 'DeepSeek API returned no content')
+    const finish = typeof choice?.finish_reason === 'string' && choice.finish_reason !== '' ? ` (finish_reason: ${choice.finish_reason})` : ''
+    throw new OptimizeError('empty-response', `DeepSeek API returned no content${finish}`)
   }
   return content
 }
