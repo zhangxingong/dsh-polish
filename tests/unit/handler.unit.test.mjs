@@ -100,7 +100,7 @@ test.describe('handler（真实 HTTP）', () => {
     const { port } = new URL(baseUrl)
     const res = await new Promise((resolve, reject) => {
       const req = http.request(
-        { host: '127.0.0.1', port, path: '/dsh-polish/optimize', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '2097153' } },
+        { host: '127.0.0.1', port, path: '/dsh-polish/optimize', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '50331649' } },
         (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => resolve({ status: r.statusCode, body: b })) },
       )
       req.on('error', reject)
@@ -114,6 +114,52 @@ test.describe('handler（真实 HTTP）', () => {
     const res = await post(baseUrl, { text: 'x'.repeat(210000) })
     assert.equal(res.status, 400)
     assert.deepEqual((await res.json()).code, 'text-too-large')
+    await close()
+  })
+  test('200：images 透传给 optimize', async () => {
+    let seen
+    const { baseUrl, close } = await serve(async (text, images) => { seen = { text, images }; return 'OPT' })
+    const res = await post(baseUrl, { text: 'x', images: [{ mediaType: 'image/png', data: 'aGk=' }] })
+    assert.equal(res.status, 200)
+    assert.deepEqual(seen, { text: 'x', images: [{ mediaType: 'image/png', data: 'aGk=' }] })
+    await close()
+  })
+  test('images 缺省 → optimize 收到空数组', async () => {
+    let seen
+    const { baseUrl, close } = await serve(async (text, images) => { seen = images; return 'OPT' })
+    const res = await post(baseUrl, { text: 'x' })
+    assert.equal(res.status, 200)
+    assert.deepEqual(seen, [])
+    await close()
+  })
+  test('400：images 非数组 → invalid-images', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const res = await post(baseUrl, { text: 'x', images: 'nope' })
+    assert.equal(res.status, 400)
+    assert.deepEqual((await res.json()).code, 'invalid-images')
+    await close()
+  })
+  test('400：非法图片项 → invalid-image', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const res = await post(baseUrl, { text: 'x', images: [{ mediaType: 'image/bmp', data: 'aGk=' }] })
+    assert.equal(res.status, 400)
+    assert.deepEqual((await res.json()).code, 'invalid-image')
+    await close()
+  })
+  test('400：超 20 张 → too-many-images', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const many = Array.from({ length: 21 }, () => ({ mediaType: 'image/png', data: 'aGk=' }))
+    const res = await post(baseUrl, { text: 'x', images: many })
+    assert.equal(res.status, 400)
+    assert.deepEqual((await res.json()).code, 'too-many-images')
+    await close()
+  })
+  test('400：单图 base64 解码超 32MB → image-too-large', async () => {
+    const { baseUrl, close } = await serve(async (t) => t)
+    const big = { mediaType: 'image/png', data: Buffer.alloc(33 * 1024 * 1024).toString('base64') }
+    const res = await post(baseUrl, { text: 'x', images: [big] })
+    assert.equal(res.status, 400)
+    assert.deepEqual((await res.json()).code, 'image-too-large')
     await close()
   })
 })
