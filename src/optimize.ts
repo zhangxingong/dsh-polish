@@ -1,6 +1,7 @@
 /**
  * 优化细化的 DeepSeek 直连层。纯函数 + 注入 fetch/resolveApiKey，可在 node --test 驱动。
  * 错误统一为 OptimizeError（code 供 handler 映射 HTTP 语义）。
+ * vision：user 消息 content 为块数组——文本块 + 上传图 data URI 块 + 文本内图片链接块（模型侧自动下载）。
  */
 
 export type OptimizeErrorCode = 'missing-credential' | 'transport' | 'api-error' | 'empty-response'
@@ -16,7 +17,7 @@ export class OptimizeError extends Error {
   }
 }
 
-export const MODEL = 'deepseek-v4-flash'
+export const MODEL = 'deepseek-v4-flash-vision-exp'
 export const BASE_URL = 'https://api.deepseek.com'
 export const MAX_OUTPUT_TOKENS = 8192
 
@@ -29,7 +30,34 @@ export const SYSTEM_PROMPT = [
   '只输出优化后的完整文本，不要输出任何解释、标题或前后缀。',
 ].join('\n')
 
-export function buildOptimizePrompt(text: string, systemPrompt: string = SYSTEM_PROMPT) {
+export interface ImagePayload {
+  mediaType: string
+  data: string
+}
+
+export const IMAGE_LINK_RE = /https?:\/\/[^\s"'<>]+\.(?:png|jpe?g|gif|webp)(?:\?[^\s"'<>]*)?/gi
+
+export function extractImageLinks(text: string): string[] {
+  const matches = text.match(IMAGE_LINK_RE)
+  return matches ?? []
+}
+
+export type UserContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
+export function buildOptimizePrompt(text: string, images: ImagePayload[] = [], systemPrompt: string = SYSTEM_PROMPT) {
+  const content: UserContentBlock[] = [
+    { type: 'text', text },
+    ...images.map((image) => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${image.mediaType};base64,${image.data}` },
+    })),
+    ...extractImageLinks(text).map((url) => ({
+      type: 'image_url' as const,
+      image_url: { url },
+    })),
+  ]
   return {
     model: MODEL,
     temperature: 0.3,
@@ -37,7 +65,7 @@ export function buildOptimizePrompt(text: string, systemPrompt: string = SYSTEM_
     max_tokens: Math.min(Math.max(1024, Math.ceil(text.length * 2) + 512), MAX_OUTPUT_TOKENS),
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: text },
+      { role: 'user', content },
     ],
   }
 }
@@ -46,6 +74,7 @@ export interface OptimizeDeps {
   fetchImpl?: typeof fetch
   resolveApiKey?: () => Promise<string>
   systemPrompt?: string
+  images?: ImagePayload[]
 }
 
 async function ambientApiKey(): Promise<string> {
@@ -77,7 +106,7 @@ export async function callDeepSeekOptimize(text: string, deps: OptimizeDeps = {}
         'content-type': 'application/json',
         accept: 'application/json',
       },
-      body: JSON.stringify(buildOptimizePrompt(text, systemPrompt)),
+      body: JSON.stringify(buildOptimizePrompt(text, deps.images ?? [], systemPrompt)),
       signal: AbortSignal.timeout(30_000),
     })
   } catch (err) {

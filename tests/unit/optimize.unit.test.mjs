@@ -41,10 +41,10 @@ test.describe('buildOptimizePrompt', () => {
     for (const kw of ['核心想法', '语病', '冗余', '细节', '语气风格', '只输出优化后的完整文本']) {
       assert.ok(s.includes(kw), `system 应包含「${kw}」`)
     }
-    assert.deepEqual(p.messages[1], { role: 'user', content: '你好' })
+    assert.deepEqual(p.messages[1], { role: 'user', content: [{ type: 'text', text: '你好' }] })
   })
   test('自定义 systemPrompt 透传', () => {
-    const p = buildOptimizePrompt('x', '自定义提示')
+    const p = buildOptimizePrompt('x', [], '自定义提示')
     assert.equal(p.messages[0].content, '自定义提示')
   })
   test('空白 systemPrompt 回退默认', async () => {
@@ -125,5 +125,56 @@ test.describe('callDeepSeekOptimize', () => {
       systemPrompt: '我的专属提示',
     })
     assert.equal(JSON.parse(calls[0].init.body).messages[0].content, '我的专属提示')
+  })
+})
+
+test.describe('buildOptimizePrompt vision', () => {
+  test('MODEL 为 vision 模型', () => {
+    assert.equal(MODEL, 'deepseek-v4-flash-vision-exp')
+  })
+  test('上传图 → data URI image_url 块', () => {
+    const p = buildOptimizePrompt('看图', [{ mediaType: 'image/png', data: 'aGVsbG8=' }])
+    assert.deepEqual(p.messages[1].content[1], { type: 'image_url', image_url: { url: 'data:image/png;base64,aGVsbG8=' } })
+  })
+  test('文本内图片链接 → image_url 块，链接保留在文本中', () => {
+    const p = buildOptimizePrompt('见图 https://cdn.example.com/a.png 谢谢')
+    assert.deepEqual(p.messages[1].content, [
+      { type: 'text', text: '见图 https://cdn.example.com/a.png 谢谢' },
+      { type: 'image_url', image_url: { url: 'https://cdn.example.com/a.png' } },
+    ])
+  })
+  test('多链接、大小写扩展名与 query 参数', () => {
+    const p = buildOptimizePrompt('https://a.com/1.JPG?x=1 和 http://b.com/t.gif')
+    assert.deepEqual(p.messages[1].content.slice(1), [
+      { type: 'image_url', image_url: { url: 'https://a.com/1.JPG?x=1' } },
+      { type: 'image_url', image_url: { url: 'http://b.com/t.gif' } },
+    ])
+  })
+  test('无扩展名图片 URL 不提取', () => {
+    const p = buildOptimizePrompt('看 https://example.com/photo?id=3')
+    assert.equal(p.messages[1].content.length, 1)
+  })
+  test('普通网页链接不提取', () => {
+    const p = buildOptimizePrompt('看 https://example.com/page')
+    assert.equal(p.messages[1].content.length, 1)
+  })
+  test('混合：上传图在前，链接在后', () => {
+    const p = buildOptimizePrompt('见图 https://a.com/x.png', [{ mediaType: 'image/jpeg', data: 'eA==' }])
+    assert.deepEqual(p.messages[1].content.slice(1), [
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,eA==' } },
+      { type: 'image_url', image_url: { url: 'https://a.com/x.png' } },
+    ])
+  })
+  test('callDeepSeekOptimize 经 deps.images 透传 → 请求体 content 带图块', async () => {
+    await callDeepSeekOptimize('x', {
+      fetchImpl: fakeFetch(200, { choices: [{ message: { content: '优化后' } }] }),
+      resolveApiKey: async () => 'sk-test',
+      images: [{ mediaType: 'image/webp', data: 'aGk=' }],
+    })
+    const body = JSON.parse(calls[0].init.body)
+    assert.deepEqual(body.messages[1].content, [
+      { type: 'text', text: 'x' },
+      { type: 'image_url', image_url: { url: 'data:image/webp;base64,aGk=' } },
+    ])
   })
 })
