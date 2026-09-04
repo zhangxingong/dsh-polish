@@ -134,9 +134,9 @@ export function apply(ctx: ClientCtx): void {
           }),
       ),
     )
-    ctx.effect(() => () => {
+    return () => {
       offSlot()
-    }, 'dsh-polish: client lifecycle (slot entry)')
+    }
   })
 
   // 设置卡片：settingsScope 服务缺失时 scoped fiber 不启动，星按钮主链路不受影响
