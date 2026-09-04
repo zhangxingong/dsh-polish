@@ -22,12 +22,19 @@ const TOOLTIP = '智能优化：让你的输入更精准'
 interface InputState {
   draft?: string
   phase?: string
+  imageIds?: string[]
+}
+
+/** conversation 服务序列化面（平台 dsh-client-ui-conversation 提供，root 单例）。 */
+interface ConversationImages {
+  serializeDraftImages(ids: string[]): Promise<Array<{ mediaType: string; data: string; name?: string }>>
 }
 
 interface EntryProps {
   useInput: (selector: (state: unknown) => unknown) => unknown
   useProjection: (key: string) => unknown
   inputActions: { setDraft: (text: string) => void }
+  serializeImages?: (ids: string[]) => Promise<Array<{ mediaType: string; data: string; name?: string }>>
   [key: string]: unknown
 }
 
@@ -52,6 +59,7 @@ function findComposerTextarea(): HTMLTextAreaElement | null {
 function StarButton(props: EntryProps) {
   const draft = ((props.useInput((s) => (s as InputState | undefined)?.draft ?? '') as string | undefined) ?? '')
   const phase = ((props.useInput((s) => (s as InputState | undefined)?.phase ?? 'plain') as string | undefined) ?? 'plain')
+  const imageIds = ((props.useInput((s) => (s as InputState | undefined)?.imageIds ?? []) as string[] | undefined) ?? [])
   const permissions = props.useProjection('permissions') as { currentValue?: string } | undefined
   const action: PolishAction = decidePolishAction(permissions?.currentValue, phase, draft)
 
@@ -77,7 +85,12 @@ function StarButton(props: EntryProps) {
     if (disabled) return
     setBusy(true)
     void runPolishClick(action, draft, {
-      post: (text) => postJson('/dsh-polish/optimize', { text }),
+      post: (text, images) => postJson('/dsh-polish/optimize', { text, images }),
+      resolveImages: async () => {
+        if (imageIds.length === 0) return []
+        if (props.serializeImages === undefined) throw new Error('附件服务不可用，无法识别图片')
+        return props.serializeImages(imageIds)
+      },
       setDraft: (text) => props.inputActions.setDraft(text),
       focusEnd,
       notify: (text) => setToast({ seq: Date.now(), text }),
@@ -109,15 +122,22 @@ function StarButton(props: EntryProps) {
 }
 
 export function apply(ctx: ClientCtx): void {
-  const offSlot = ctx.slots.inject('conversation.input.left', () =>
-    ctx.slots.register(
-      { name: 'conversation.input.left', id: 'polish-composer', order: 31, label: TOOLTIP },
-      (props: EntryProps) => createElement(StarButton, props),
-    ),
-  )
-  ctx.effect(() => () => {
-    offSlot()
-  }, 'dsh-polish: client lifecycle (slot entry)')
+  ctx.inject(['conversation'], (cctx) => {
+    const conversation = (cctx as ClientCtx & { conversation?: ConversationImages }).conversation
+    const offSlot = ctx.slots.inject('conversation.input.left', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.left', id: 'polish-composer', order: 31, label: TOOLTIP },
+        (props: EntryProps) =>
+          createElement(StarButton, {
+            ...props,
+            serializeImages: conversation === undefined ? undefined : (ids) => conversation.serializeDraftImages(ids),
+          }),
+      ),
+    )
+    ctx.effect(() => () => {
+      offSlot()
+    }, 'dsh-polish: client lifecycle (slot entry)')
+  })
 
   // 设置卡片：settingsScope 服务缺失时 scoped fiber 不启动，星按钮主链路不受影响
   ctx.inject(['settingsScope'], (sctx) => {
