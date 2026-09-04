@@ -110,3 +110,39 @@ test.describe('postJson', () => {
     assert.match(r.message, /missing-credential 提示/)
   })
 })
+
+test.describe('runPolishClick 图片解析', () => {
+  function makeGlueWithImages() {
+    const calls = []
+    return {
+      calls,
+      glue: {
+        post: async (text, images) => { calls.push(['post', text, images]); return { ok: true, text: '优化后' } },
+        setDraft: (text) => calls.push(['setDraft', text]),
+        focusEnd: () => calls.push(['focusEnd']),
+        notify: (text) => calls.push(['notify', text]),
+        getCurrentDraft: () => '原文',
+        resolveImages: async () => [{ mediaType: 'image/png', data: 'aGk=' }],
+      },
+    }
+  }
+
+  test('resolveImages 结果随 post 透传', async () => {
+    const { calls, glue } = makeGlueWithImages()
+    await runPolishClick('ready', '原文', glue)
+    assert.deepEqual(calls[0], ['post', '原文', [{ mediaType: 'image/png', data: 'aGk=' }]])
+    assert.deepEqual(calls.slice(1), [['setDraft', '优化后'], ['focusEnd']])
+  })
+  test('resolveImages 抛错 → notify 原消息，不 post 不动草稿', async () => {
+    const { calls, glue } = makeGlueWithImages()
+    glue.resolveImages = async () => { throw new Error('附件服务不可用') }
+    await runPolishClick('ready', '原文', glue)
+    assert.deepEqual(calls, [['notify', '附件服务不可用']])
+  })
+  test('无 resolveImages → post 收到空数组', async () => {
+    const { calls, glue } = makeGlueWithImages()
+    delete glue.resolveImages
+    await runPolishClick('ready', '原文', glue)
+    assert.deepEqual(calls[0], ['post', '原文', []])
+  })
+})

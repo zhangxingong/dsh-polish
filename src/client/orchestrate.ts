@@ -1,8 +1,10 @@
 /**
- * 点击编排（纯、可注入）：empty → 提示；ready → post → 成功 setDraft+focusEnd，失败 notify。
+ * 点击编排（纯、可注入）：empty → 提示；ready → 先 resolveImages（失败 notify 不动草稿）
+ * → post → 成功 setDraft+focusEnd，失败 notify。
  * postJson 归一所有运输失败为结构化 PolishResult，永不 reject（composer-tools bridgeCore 同款）。
  */
 import type { PolishAction } from './state.js'
+import type { ImagePayload } from '../optimize.js'
 
 export interface PolishResult {
   ok: boolean
@@ -57,11 +59,12 @@ export async function postJson(path: string, body: unknown, fetchImpl: FetchLike
 }
 
 export interface PolishGlue {
-  post(text: string): Promise<PolishResult>
+  post(text: string, images?: ImagePayload[]): Promise<PolishResult>
   setDraft(text: string): void
   focusEnd(): void
   notify(text: string): void
   getCurrentDraft?: () => string
+  resolveImages?: () => Promise<ImagePayload[]>
 }
 
 export const EMPTY_HINT = '请先输入内容再进行优化细化'
@@ -72,7 +75,16 @@ export async function runPolishClick(action: PolishAction, draft: string, glue: 
     return
   }
   if (action !== 'ready') return
-  const result = await glue.post(draft)
+  let images: ImagePayload[] = []
+  if (glue.resolveImages !== undefined) {
+    try {
+      images = await glue.resolveImages()
+    } catch (err) {
+      glue.notify(err instanceof Error ? err.message : String(err))
+      return
+    }
+  }
+  const result = await glue.post(draft, images)
   if (result.ok && typeof result.text === 'string' && result.text.trim().length > 0) {
     const current = glue.getCurrentDraft?.()
     if (current !== undefined && current !== draft) {
